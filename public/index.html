@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather Predictor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="sky"></div>
+
+  <main class="home">
+    <h1>Weather Predictor</h1>
+    <div class="search">
+      <input id="place" type="text" placeholder="Search a city" autocomplete="off">
+      <ul id="suggestions"></ul>
+    </div>
+  </main>
+
+  <script src="sky.js"></script>
+  <script>
+    setSky("cloudy");
+
+    var input = document.getElementById("place");
+    var box = document.getElementById("suggestions");
+    var places = [];
+    var timer;
+
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      var q = input.value.trim();
+      if (q.length < 2) { box.innerHTML = ""; return; }
+
+      // wait 300 ms after the last keystroke before asking the server
+      timer = setTimeout(async function () {
+        try {
+          var res = await fetch("/api/suggest?q=" + encodeURIComponent(q));
+          places = await res.json();
+          showSuggestions();
+        } catch (e) {
+          box.innerHTML = "";
+        }
+      }, 300);
+    });
+
+    function showSuggestions() {
+      box.innerHTML = "";
+      if (!places.length) {
+        var none = document.createElement("li");
+        none.className = "none";
+        none.textContent = "No place found";
+        box.appendChild(none);
+        return;
+      }
+      places.forEach(function (p) {
+        var li = document.createElement("li");
+        li.textContent = [p.name, p.state, p.country].filter(Boolean).join(", ");
+        li.addEventListener("click", function () { openPlace(p); });
+        box.appendChild(li);
+      });
+    }
+
+    function openPlace(p) {
+      var qs = new URLSearchParams({
+        lat: p.latitude, lon: p.longitude,
+        name: p.name, state: p.state, country: p.country
+      });
+      location.href = "weather.html?" + qs.toString();
+    }
+
+    // Pressing Enter opens the first suggestion
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && places.length) openPlace(places[0]);
+    });
+  </script>
+</body>
+</html>

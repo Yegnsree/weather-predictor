@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="sky"></div>
+
+  <main class="page">
+    <a class="back" href="/">← Search another city</a>
+
+    <section class="now">
+      <p id="place"></p>
+      <div class="big"><span id="icon"></span><span id="temp"></span></div>
+      <p id="cond"></p>
+      <p id="more"></p>
+    </section>
+
+    <p id="msg">Loading weather...</p>
+    <div class="strip" id="strip"></div>
+  </main>
+
+  <script src="sky.js"></script>
+  <script>
+    var CODES = {
+      0: ["Clear sky", "☀️"], 1: ["Mostly clear", "🌤️"], 2: ["Partly cloudy", "⛅"], 3: ["Overcast", "☁️"],
+      45: ["Fog", "🌫️"], 48: ["Fog", "🌫️"],
+      51: ["Light drizzle", "🌦️"], 53: ["Drizzle", "🌦️"], 55: ["Heavy drizzle", "🌧️"],
+      56: ["Freezing drizzle", "🌧️"], 57: ["Freezing drizzle", "🌧️"],
+      61: ["Light rain", "🌧️"], 63: ["Rain", "🌧️"], 65: ["Heavy rain", "🌧️"],
+      66: ["Freezing rain", "🌧️"], 67: ["Freezing rain", "🌧️"],
+      71: ["Light snow", "🌨️"], 73: ["Snow", "🌨️"], 75: ["Heavy snow", "❄️"], 77: ["Snow grains", "🌨️"],
+      80: ["Rain showers", "🌦️"], 81: ["Rain showers", "🌧️"], 82: ["Violent showers", "🌧️"],
+      85: ["Snow showers", "🌨️"], 86: ["Snow showers", "🌨️"],
+      95: ["Thunderstorm", "⛈️"], 96: ["Thunderstorm with hail", "⛈️"], 99: ["Thunderstorm with hail", "⛈️"]
+    };
+
+    function describe(code, isDay) {
+      var d = CODES[code] || ["Unknown", "🌡️"];
+      var icon = d[1];
+      if (!isDay && (code === 0 || code === 1)) icon = "🌙";
+      return { text: d[0], icon: icon };
+    }
+
+    function skyFor(code, isDay) {
+      if (code >= 95) return "stormy";
+      if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return "rainy";
+      if (code <= 1) return isDay ? "sunny" : "night";
+      return "cloudy";
+    }
+
+    function hour12(t) {
+      var h = parseInt(t.slice(11, 13), 10);
+      if (h === 0) return "12 am";
+      if (h < 12) return h + " am";
+      if (h === 12) return "12 pm";
+      return (h - 12) + " pm";
+    }
+
+    var params = new URLSearchParams(location.search);
+    var msg = document.getElementById("msg");
+    document.getElementById("place").textContent =
+      [params.get("name"), params.get("state"), params.get("country")].filter(Boolean).join(", ");
+
+    async function load() {
+      try {
+        var res = await fetch("/api/weather?lat=" + encodeURIComponent(params.get("lat")) +
+                              "&lon=" + encodeURIComponent(params.get("lon")));
+        var data = await res.json();
+        if (!res.ok) { msg.textContent = data.error; setSky("cloudy"); return; }
+        show(data);
+      } catch (e) {
+        msg.textContent = "Could not reach the server. Is node server.js running?";
+        setSky("cloudy");
+      }
+    }
+
+    function show(data) {
+      var c = data.current;
+      var d = describe(c.weather_code, c.is_day);
+
+      document.getElementById("icon").textContent = d.icon;
+      document.getElementById("temp").textContent = Math.round(c.temperature_2m) + "°";
+      document.getElementById("cond").textContent = d.text;
+      document.getElementById("more").textContent =
+        "Feels like " + Math.round(c.apparent_temperature) + "° · Humidity " + c.relative_humidity_2m +
+        "% · Wind " + Math.round(c.wind_speed_10m) + " km/h";
+
+      // add &sky=stormy (or rainy, sunny, cloudy, night) to the address to test an effect
+      setSky(params.get("sky") || skyFor(c.weather_code, c.is_day));
+
+      var strip = document.getElementById("strip");
+      strip.innerHTML = "";
+      var h = data.hourly;
+      for (var i = 0; i < h.time.length; i++) {
+        var info = describe(h.code[i], h.isDay[i]);
+        var div = document.createElement("div");
+        div.className = "hour";
+        div.innerHTML =
+          '<div class="t">' + (i === 0 ? "Now" : hour12(h.time[i])) + "</div>" +
+          '<div class="i" title="' + info.text + '">' + info.icon + "</div>" +
+          '<div class="d">' + Math.round(h.temperature[i]) + "°</div>" +
+          '<div class="r">💧 ' + h.rain[i] + "%</div>";
+        strip.appendChild(div);
+      }
+      msg.textContent = "";
+    }
+
+    load();
+  </script>
+</body>
+</html>
