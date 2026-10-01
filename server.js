@@ -58,7 +58,8 @@ app.get("/api/weather", async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log("Open http://localhost:3000");
-  exec("start chrome http://localhost:3000"); // opens Chrome on Windows
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Open http://localhost:" + PORT);
+  if (!process.env.PORT) exec("start chrome http://localhost:" + PORT);
 });
